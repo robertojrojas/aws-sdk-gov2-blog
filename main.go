@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -15,9 +16,10 @@ import (
 )
 
 const (
-	ubuntuImageSearch = "ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64*"
-	keyName           = "aws-sdk-gov2-key"
-	ec2Type           = "t2.medium"
+	ubuntuImageSearch      = "ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64*"
+	keyName                = "aws-sdk-gov2-key"
+	ec2Type                = "t2.micro"
+	userDataScriptFilename = "user_data.sh"
 )
 
 func main() {
@@ -58,8 +60,8 @@ func main() {
 		exitErrorf(
 			"Unable to get public IP for instance [%s], %v", instanceID, err)
 	}
-	fmt.Printf("ssh -i %s.pem ubuntu@%s\n", keyName, pubIP)
-
+	fmt.Printf("\n\n\n ssh -i %s.pem ubuntu@%s\n\n\n", keyName, pubIP)
+	fmt.Printf("CLEANUP: ./cleanup.sh %s %s\n", instanceID, keyName)
 }
 
 func getEC2Client(region string) (*ec2.EC2, error) {
@@ -149,12 +151,19 @@ func createSSHKeyPair(client *ec2.EC2) error {
 
 func runInstance(client *ec2.EC2, ami string) (string, error) {
 	fmt.Println("runInstance using AMI:", ami)
+
+	userDataScript, err := readUsserDataScriptFileAndEncode()
+	if err != nil {
+		return "", err
+	}
+
 	rii := &ec2.RunInstancesInput{
 		ImageId:      aws.String(ami),
 		InstanceType: ec2.InstanceType(ec2Type),
 		MinCount:     aws.Int64(1),
 		MaxCount:     aws.Int64(1),
 		KeyName:      aws.String(keyName),
+		UserData:     aws.String(userDataScript),
 	}
 	rir := client.RunInstancesRequest(rii)
 	reservation, err := rir.Send()
@@ -189,6 +198,15 @@ func writeFile(filename string, contents []byte) error {
 		return err
 	}
 	return nil
+}
+
+func readUsserDataScriptFileAndEncode() (string, error) {
+	f, err := ioutil.ReadFile(userDataScriptFilename)
+	if err != nil {
+		return "", err
+	}
+	userDataScript := base64.URLEncoding.EncodeToString(f)
+	return userDataScript, nil
 }
 
 func exitErrorf(msg string, args ...interface{}) {
