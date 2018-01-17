@@ -8,8 +8,6 @@ The AWS Go v2 SDK requires a minimum version of Go 1.9.
 
 You'll need to get the packages:
 
-``
-
 `github.com/go-ini/ini`
 
 `github.com/jmespath/go-jmespath`
